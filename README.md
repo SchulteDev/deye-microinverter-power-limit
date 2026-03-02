@@ -51,6 +51,27 @@ python deye_power_limit.py --percent 50
 
 CLI arguments always override `.env` / environment variables.
 
+### Example run
+
+```
+$ python deye_power_limit.py --percent 80 --max-power 1000
+
+Reading register 40 from 192.168.1.x (logger 4567890123) ...
+  AT greeting received, discarded.
+Current register value: 80
+  = 80% = max 800 W
+
+Setting power limit to 80% (max 800 W) ...
+  Writing register 40 = 80
+  AT greeting received, discarded.
+  Register 40 = 80 write command sent.
+  Verifying ...
+  AT greeting received, discarded.
+  Read-back value: 80%
+
+Success! Power limited to max 800 W.
+```
+
 ## Docker
 
 ```bash
