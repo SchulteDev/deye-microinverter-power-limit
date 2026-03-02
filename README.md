@@ -41,7 +41,8 @@ python deye_power_limit.py --ip 192.168.1.X --serial 1234567890 --percent 100
 
 ### `.env` File (optional)
 
-Copy `.env.example` to `.env` and fill in your values to avoid repeating `--ip` and `--serial`:
+Copy `.env.example` to `.env` and fill in your values to avoid repeating `--ip`, `--serial`, and
+optionally `--max-power`:
 
 ```bash
 cp .env.example .env   # then edit .env
@@ -54,8 +55,10 @@ CLI arguments always override `.env` / environment variables.
 ### Example run
 
 ```
-$ python deye_power_limit.py --percent 80 --max-power 1000
+$ python deye_power_limit.py --percent 80
 
+  AT greeting received, discarded.
+Detected rated power: 1000 W (from register 16)
 Reading register 40 from 192.168.1.x (logger 4567890123) ...
   AT greeting received, discarded.
 Current register value: 80

@@ -20,6 +20,7 @@ import time
 
 # ---------- Constants ----------
 REGISTER_ADDR = 40  # Holding register "Active Power Regulation"
+RATED_POWER_REGISTER = 16  # Register 16: Device Rated Power (scale 0.1 W)
 PORT = 8899  # Solarman V5 default port
 MB_SLAVE_ID = 1  # Modbus slave ID
 
@@ -216,6 +217,21 @@ def write_register(ip: str, serial: int, register: int, value: int) -> None:
   print(f"  Register {register} = {value} write command sent.")
 
 
+def try_read_rated_power(ip: str, serial: int) -> int | None:
+  """Try to read the rated power (W) from register 16. Returns None on failure."""
+  try:
+    mb_request = build_modbus_read(MB_SLAVE_ID, RATED_POWER_REGISTER, 1)
+    response = send_receive(ip, serial, mb_request)
+    mb_response = v5_decode_response(response)
+    values = parse_modbus_read_response(mb_response)
+    watts = int(values[0] * 0.1)
+    if 10 <= watts <= 10000:
+      return watts
+  except (ValueError, OSError):
+    pass
+  return None
+
+
 # ========== .env loader ==========
 
 def load_dotenv() -> None:
@@ -251,8 +267,10 @@ def main() -> None:
                       help="Serial number of the data logger (env: DEYE_SERIAL)")
   parser.add_argument("--percent", type=int, default=None,
                       help="Power limit in percent (1-100)")
-  parser.add_argument("--max-power", type=int, default=None,
-                      help="Rated inverter power in watts (display only, e.g. 1600)")
+  parser.add_argument("--max-power", type=int,
+                      default=os.environ.get("DEYE_MICROINVERTER_MAX_POWER"),
+                      help="Rated inverter power in watts (display only, e.g. 1600)"
+                           " (env: DEYE_MICROINVERTER_MAX_POWER)")
   parser.add_argument("--read-only", action="store_true",
                       help="Only read the current register value")
   args = parser.parse_args()
@@ -261,18 +279,27 @@ def main() -> None:
     parser.error("--ip is required (or set DEYE_IP in .env / environment)")
   if args.serial is None:
     parser.error(
-      "--serial is required (or set DEYE_SERIAL in .env / environment)")
+        "--serial is required (or set DEYE_SERIAL in .env / environment)")
 
   if not (0 < args.serial <= 0xFFFFFFFF):
     parser.error("--serial must be a positive integer (max 4294967295)")
+
+  # --- Rated power (best-effort) ---
+  max_power = args.max_power
+  if not max_power:
+    detected = try_read_rated_power(args.ip, args.serial)
+    if detected:
+      max_power = detected
+      print(
+        f"Detected rated power: {max_power} W (from register {RATED_POWER_REGISTER})")
 
   # --- Read ---
   print(
       f"Reading register {REGISTER_ADDR} from {args.ip} (logger {args.serial}) ...")
   current = read_register(args.ip, args.serial, REGISTER_ADDR)
   print(f"Current register value: {current}")
-  if args.max_power:
-    print(f"  = {current}% = max {args.max_power * current / 100:.0f} W")
+  if max_power:
+    print(f"  = {current}% = max {max_power * current / 100:.0f} W")
   else:
     print(f"  = {current}%")
   print()
@@ -291,8 +318,8 @@ def main() -> None:
     print(f"ERROR: percent must be between 1 and 100 (got {percent}).")
     sys.exit(1)
 
-  if args.max_power:
-    target_w = args.max_power * percent / 100
+  if max_power:
+    target_w = max_power * percent / 100
     print(f"Setting power limit to {percent}% (max {target_w:.0f} W) ...")
   else:
     print(f"Setting power limit to {percent}% ...")
@@ -306,7 +333,7 @@ def main() -> None:
   print(f"  Read-back value: {verify}%")
 
   if verify == percent:
-    if args.max_power:
+    if max_power:
       print(f"\nSuccess! Power limited to max {target_w:.0f} W.")
     else:
       print(f"\nSuccess! Power limited to {percent}%.")

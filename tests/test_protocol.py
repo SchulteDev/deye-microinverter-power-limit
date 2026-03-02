@@ -8,11 +8,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from unittest.mock import patch
+
 from deye_power_limit import (
   build_modbus_read,
   build_modbus_write_multiple,
   modbus_crc16,
   parse_modbus_read_response,
+  try_read_rated_power,
   v5_build_frame,
   v5_decode_response,
 )
@@ -147,3 +150,39 @@ def test_parse_modbus_error_response():
   frame = bytes([0x01, 0x83, 0x02])
   with pytest.raises(ValueError, match="Illegal Data Address"):
     parse_modbus_read_response(frame)
+
+
+# ========== Rated Power Detection ==========
+
+def _fake_send_receive(register_value):
+  """Return a send_receive mock that replies with a single register value."""
+  modbus = bytes([0x01, 0x03, 0x02]) + struct.pack(">H", register_value)
+  modbus += modbus_crc16(modbus)
+  return lambda ip, serial, mb: _build_v5_response(serial, modbus)
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_1000w(mock_sr):
+  """Register value 10000 with scale 0.1 → 1000 W."""
+  mock_sr.side_effect = _fake_send_receive(10000)
+  assert try_read_rated_power("1.2.3.4", 123) == 1000
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_1600w(mock_sr):
+  """Register value 16000 with scale 0.1 → 1600 W."""
+  mock_sr.side_effect = _fake_send_receive(16000)
+  assert try_read_rated_power("1.2.3.4", 123) == 1600
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_out_of_range(mock_sr):
+  """Value below 10 W should be rejected as implausible."""
+  mock_sr.side_effect = _fake_send_receive(5)  # 0.5 W
+  assert try_read_rated_power("1.2.3.4", 123) is None
+
+
+@patch("deye_power_limit.send_receive", side_effect=OSError("timeout"))
+def test_try_read_rated_power_connection_error(mock_sr):
+  """Network errors should return None, not raise."""
+  assert try_read_rated_power("1.2.3.4", 123) is None
