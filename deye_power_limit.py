@@ -44,12 +44,6 @@ def build_modbus_read(slave: int, register: int, count: int) -> bytes:
     return frame + modbus_crc16(frame)
 
 
-def build_modbus_write_single(slave: int, register: int, value: int) -> bytes:
-    """Function 0x06: Write Single Register."""
-    frame = struct.pack(">B B H H", slave, 0x06, register, value)
-    return frame + modbus_crc16(frame)
-
-
 def build_modbus_write_multiple(slave: int, register: int, values: list[int]) -> bytes:
     """Function 0x10: Write Multiple Registers."""
     count = len(values)

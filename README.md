@@ -46,10 +46,10 @@ docker run --rm --network host deye-power-limit \
   --ip 192.168.1.X --serial 1234567890 --percent 50
 ```
 
-Or pull from GHCR (after first release):
+Or pull from GHCR:
 
 ```bash
-docker run --rm --network host ghcr.io/SchulteDev/deye-power-limit:latest \
+docker run --rm --network host ghcr.io/schultedev/deye-power-limit:main \
   --ip 192.168.1.X --serial 1234567890 --read-only
 ```
 
@@ -65,7 +65,7 @@ The serial number is a **10-digit integer** (e.g. `4140346640`), not the inverte
 
 ## Modbus Register Reference
 
-See [MODBUS_REGISTERS.md](MODBUS_REGISTERS.md) for a full table of all known registers, confirmed sources, and configuration options available without a business account.
+See [MODBUS_REGISTERS.md](MODBUS_REGISTERS.md) for register details and sources.
 
 ## EEPROM Wear Warning
 
