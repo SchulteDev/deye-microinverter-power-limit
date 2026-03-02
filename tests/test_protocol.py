@@ -96,7 +96,7 @@ def test_v5_decode_response_invalid_start():
 def test_v5_decode_response_invalid_end():
     modbus = bytes([0x01, 0x03, 0x02, 0x00, 0x32, 0x39, 0x91])
     response = bytearray(_build_v5_response(123456789, modbus))
-    response[-1] = 0x00
+    response[-1] = 0x00  # break end byte (checked before checksum)
     with pytest.raises(ValueError, match="invalid end byte"):
         v5_decode_response(bytes(response))
 
@@ -104,9 +104,34 @@ def test_v5_decode_response_invalid_end():
 def test_v5_decode_response_wrong_control_code():
     modbus = bytes([0x01, 0x03, 0x02, 0x00, 0x32, 0x39, 0x91])
     response = bytearray(_build_v5_response(123456789, modbus))
-    response[3:5] = struct.pack("<H", 0x4510)
+    response[3:5] = struct.pack("<H", 0x4510)  # change control code
+    response[-2] = sum(response[1:-2]) & 0xFF  # recalculate checksum
     with pytest.raises(ValueError, match="V5 control code"):
         v5_decode_response(bytes(response))
+
+
+def test_v5_decode_response_bad_checksum():
+    modbus = bytes([0x01, 0x03, 0x02, 0x00, 0x32, 0x39, 0x91])
+    response = bytearray(_build_v5_response(123456789, modbus))
+    response[-2] = (response[-2] + 1) & 0xFF  # corrupt checksum
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        v5_decode_response(bytes(response))
+
+
+def test_v5_decode_response_wrong_frametype():
+    modbus = bytes([0x01, 0x03, 0x02, 0x00, 0x32, 0x39, 0x91])
+    response = bytearray(_build_v5_response(123456789, modbus))
+    response[11] = 0x01  # change frametype from 0x02 to 0x01
+    response[-2] = sum(response[1:-2]) & 0xFF  # recalculate checksum
+    with pytest.raises(ValueError, match="not a data frame"):
+        v5_decode_response(bytes(response))
+
+
+def test_v5_decode_response_modbus_too_short():
+    short_modbus = bytes([0x01, 0x03])  # only 2 bytes, minimum is 5
+    response = _build_v5_response(123456789, short_modbus)
+    with pytest.raises(ValueError, match="Modbus frame too short"):
+        v5_decode_response(response)
 
 
 # ========== Modbus Response Parsing ==========

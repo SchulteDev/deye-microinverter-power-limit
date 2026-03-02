@@ -1,10 +1,10 @@
-# deye-power-limit
+# deye-microinverter-power-limit
 
 Set the power output limit on Deye microinverters via Solarman V5 / Modbus.
 
-[![CI](https://github.com/SchulteDev/deye-power-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/SchulteDev/deye-power-limit/actions/workflows/ci.yml)
+[![CI](https://github.com/SchulteDev/deye-microinverter-power-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/SchulteDev/deye-microinverter-power-limit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://python.org)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io)
 
 ## What This Does
@@ -15,7 +15,7 @@ Works with any Deye microinverter that has a Solarman-compatible data logger (e.
 
 ## Prerequisites
 
-- **Python 3.10+** (no third-party packages required)
+- **Python 3.12+** (no third-party packages required)
 - The Solarman data logger must be reachable on your **local network** (TCP port 8899)
 - You need the logger's **IP address** and **serial number**
 
@@ -39,17 +39,17 @@ python deye_power_limit.py --ip 192.168.1.X --serial 1234567890 --percent 100
 
 ```bash
 # Build
-docker build -t deye-power-limit .
+docker build -t deye-microinverter-power-limit .
 
 # Run
-docker run --rm --network host deye-power-limit \
+docker run --rm --network host deye-microinverter-power-limit \
   --ip 192.168.1.X --serial 1234567890 --percent 50
 ```
 
 Or pull from GHCR:
 
 ```bash
-docker run --rm --network host ghcr.io/schultedev/deye-power-limit:main \
+docker run --rm --network host ghcr.io/schultedev/deye-microinverter-power-limit:main \
   --ip 192.168.1.X --serial 1234567890 --read-only
 ```
 

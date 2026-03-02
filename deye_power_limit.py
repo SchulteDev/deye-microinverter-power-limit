@@ -57,7 +57,7 @@ def build_modbus_write_multiple(slave: int, register: int, values: list[int]) ->
 # ========== Solarman V5 Protocol ==========
 
 def v5_build_frame(serial: int, modbus_frame: bytes, seq: int = 0x01) -> bytes:
-    """Build a Solarman V5 frame — matches pysolarmanv5._v5_frame_encoder."""
+    """Build a Solarman V5 frame (based on the pysolarmanv5 frame encoder)."""
     # Payload (15 bytes header + modbus)
     payload = bytearray()
     payload.append(0x02)                        # frametype
@@ -92,12 +92,19 @@ def v5_build_frame(serial: int, modbus_frame: bytes, seq: int = 0x01) -> bytes:
 
 
 def v5_decode_response(data: bytes) -> bytes:
-    """Extract the Modbus frame from a V5 response (offset 25 to len-2)."""
+    """Extract the Modbus frame from a V5 response (offset 25 to frame_len-2)."""
     if len(data) < 10 or data[0] != 0xA5:
         raise ValueError(f"Invalid V5 frame (len={len(data)}, start=0x{data[0]:02X})")
 
     if data[-1] != 0x15:
         raise ValueError(f"V5 frame: invalid end byte 0x{data[-1]:02X}")
+
+    # Validate checksum
+    expected_checksum = sum(data[1:-2]) & 0xFF
+    if data[-2] != expected_checksum:
+        raise ValueError(
+            f"V5 checksum mismatch (got 0x{data[-2]:02X}, expected 0x{expected_checksum:02X})"
+        )
 
     # Check control code (response = 0x1510)
     control = struct.unpack("<H", data[3:5])[0]
@@ -108,7 +115,7 @@ def v5_decode_response(data: bytes) -> bytes:
     if len(data) > 11 and data[11] != 0x02:
         raise ValueError(f"V5 frametype 0x{data[11]:02X} (expected 0x02, not a data frame)")
 
-    # Extract Modbus frame (pysolarmanv5: offset 25 to frame_len-2)
+    # Extract Modbus frame (offset 25 to frame_len-2)
     payload_len = struct.unpack("<H", data[1:3])[0]
     frame_len = 13 + payload_len
     modbus = data[25:frame_len - 2]
@@ -121,6 +128,9 @@ def v5_decode_response(data: bytes) -> bytes:
 
 def parse_modbus_read_response(frame: bytes) -> list[int]:
     """Parse a Modbus read response and return register values."""
+    if len(frame) < 3:
+        raise ValueError(f"Modbus response too short ({len(frame)} bytes)")
+
     function = frame[1]
     if function & 0x80:
         error_code = frame[2]
@@ -160,7 +170,7 @@ def send_receive(ip: str, serial: int, modbus_frame: bytes) -> bytes:
         sock.settimeout(15)
         sock.sendall(v5_frame)
 
-        # Wait for a valid V5 data response (up to 10 frames / 15 seconds)
+        # Wait for a valid V5 data response (15-second deadline)
         deadline = time.time() + 15
         while time.time() < deadline:
             try:
@@ -170,7 +180,7 @@ def send_receive(ip: str, serial: int, modbus_frame: bytes) -> bytes:
                 break
 
             if not data:
-                continue
+                break  # Connection closed by remote end
 
             # Only accept V5 frames (0xA5) with frametype 0x02
             if data[0] == 0xA5 and len(data) > 11 and data[11] == 0x02:
@@ -194,11 +204,11 @@ def write_register(ip: str, serial: int, register: int, value: int) -> None:
     response = send_receive(ip, serial, mb_request)
     try:
         v5_decode_response(response)
-    except ValueError:
-        # Write response may have a shorter Modbus frame; success is
-        # verified by the subsequent read-back.
-        pass
-    print(f"  Register {register} = {value} written.")
+    except ValueError as e:
+        # Write-multiple (FC 0x10) ack is only 8 bytes; "too short" is expected.
+        if "too short" not in str(e):
+            print(f"  WARNING: unexpected response after write: {e}", file=sys.stderr)
+    print(f"  Register {register} = {value} write command sent.")
 
 
 # ========== Main ==========
@@ -218,6 +228,9 @@ def main() -> None:
     parser.add_argument("--read-only", action="store_true",
                         help="Only read the current register value")
     args = parser.parse_args()
+
+    if not (0 < args.serial <= 0xFFFFFFFF):
+        parser.error("--serial must be a positive integer (max 4294967295)")
 
     # --- Read ---
     print(f"Reading register {REGISTER_ADDR} from {args.ip} (logger {args.serial}) ...")
@@ -267,4 +280,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        sys.exit(130)
+    except (OSError, ConnectionError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
