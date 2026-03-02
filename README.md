@@ -2,7 +2,7 @@
 
 Set the power output limit on Deye microinverters via Solarman V5 / Modbus.
 
-[![CI](https://github.com/OWNER/deye-power-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/deye-power-limit/actions/workflows/ci.yml)
+[![CI](https://github.com/SchulteDev/deye-power-limit/actions/workflows/ci.yml/badge.svg)](https://github.com/SchulteDev/deye-power-limit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io)
@@ -49,7 +49,7 @@ docker run --rm --network host deye-power-limit \
 Or pull from GHCR (after first release):
 
 ```bash
-docker run --rm --network host ghcr.io/OWNER/deye-power-limit:latest \
+docker run --rm --network host ghcr.io/SchulteDev/deye-power-limit:latest \
   --ip 192.168.1.X --serial 1234567890 --read-only
 ```
 
