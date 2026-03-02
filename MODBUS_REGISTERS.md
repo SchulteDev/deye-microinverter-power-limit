@@ -20,18 +20,19 @@ over TCP port 8899.
 
 ## Register 16 (0x0010) — Device Rated Power
 
-| Field   | Value              |
-|---------|--------------------|
-| Address | 16 (0x0010)        |
-| Name    | Device Rated Power |
-| Unit    | W                  |
-| Scale   | 0.1                |
-| Range   | 1–2250 W           |
-| Access  | Read               |
+| Field   | Value                             |
+|---------|-----------------------------------|
+| Address | 16 (0x0010)                       |
+| Name    | Device Rated Power                |
+| Unit    | W                                 |
+| Scale   | 0.1                               |
+| Range   | 1–2250 W (per ha-solarman source) |
+| Access  | Read                              |
 
 The inverter's nameplate power rating. A 1000 W inverter returns raw value `10000` → 1000 W.
 Read with FC 0x03. This is used as a best-effort lookup when `--max-power` is not provided — the
-read may not be supported on all logger firmware versions.
+read may not be supported on all logger firmware versions. The tool accepts values in the range
+10–10000 W.
 
 Source: [davidrapan/ha-solarman](https://github.com/davidrapan/ha-solarman) — deye_micro.yaml.
 

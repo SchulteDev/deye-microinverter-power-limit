@@ -13,6 +13,7 @@ from unittest.mock import patch
 from deye_power_limit import (
   build_modbus_read,
   build_modbus_write_multiple,
+  main,
   modbus_crc16,
   parse_modbus_read_response,
   try_read_rated_power,
@@ -176,13 +177,84 @@ def test_try_read_rated_power_1600w(mock_sr):
 
 
 @patch("deye_power_limit.send_receive")
-def test_try_read_rated_power_out_of_range(mock_sr):
-  """Value below 10 W should be rejected as implausible."""
+def test_try_read_rated_power_out_of_range_low(mock_sr):
+  """Scaled value below 10 W (raw=5, 0.5 W) should be rejected."""
   mock_sr.side_effect = _fake_send_receive(5)  # 0.5 W
   assert try_read_rated_power("1.2.3.4", 123) is None
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_boundary_low_accept(mock_sr):
+  """Raw value 100 (= 10 W) is exactly at the lower boundary — accepted."""
+  mock_sr.side_effect = _fake_send_receive(100)
+  assert try_read_rated_power("1.2.3.4", 123) == 10
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_boundary_low_reject(mock_sr):
+  """Raw value 99 (= 9 W) is just below the lower boundary — rejected."""
+  mock_sr.side_effect = _fake_send_receive(99)
+  assert try_read_rated_power("1.2.3.4", 123) is None
+
+
+@patch("deye_power_limit.send_receive")
+def test_try_read_rated_power_max_register_value(mock_sr):
+  """Max 16-bit register value 65535 (= 6553 W) is within range — accepted."""
+  mock_sr.side_effect = _fake_send_receive(65535)
+  assert try_read_rated_power("1.2.3.4", 123) == 6553
 
 
 @patch("deye_power_limit.send_receive", side_effect=OSError("timeout"))
 def test_try_read_rated_power_connection_error(mock_sr):
   """Network errors should return None, not raise."""
   assert try_read_rated_power("1.2.3.4", 123) is None
+
+
+@patch("deye_power_limit.send_receive",
+       side_effect=ValueError("V5 checksum mismatch"))
+def test_try_read_rated_power_value_error(mock_sr):
+  """Protocol-level ValueError (e.g. corrupt frame) should return None, not raise."""
+  assert try_read_rated_power("1.2.3.4", 123) is None
+
+
+# ========== main() integration ==========
+
+@patch("deye_power_limit.read_register", return_value=80)
+@patch("deye_power_limit.try_read_rated_power", return_value=1000)
+@patch("deye_power_limit.load_dotenv")
+def test_main_auto_detect_read_only(mock_dotenv, mock_rated, mock_read, capsys):
+  """Auto-detection result is used when --max-power is not provided."""
+  with patch("sys.argv",
+             ["prog", "--ip", "1.2.3.4", "--serial", "123", "--read-only"]):
+    main()
+  out = capsys.readouterr().out
+  assert "Detected rated power: 1000 W" in out
+  assert "max 800 W" in out
+
+
+@patch("deye_power_limit.read_register", return_value=80)
+@patch("deye_power_limit.try_read_rated_power")
+@patch("deye_power_limit.load_dotenv")
+def test_main_explicit_max_power_skips_detect(mock_dotenv, mock_rated,
+    mock_read, capsys):
+  """Explicit --max-power should skip auto-detection entirely."""
+  with patch("sys.argv", ["prog", "--ip", "1.2.3.4", "--serial", "123",
+                          "--max-power", "1600", "--read-only"]):
+    main()
+  mock_rated.assert_not_called()
+  out = capsys.readouterr().out
+  assert "max 1280 W" in out
+
+
+@patch("deye_power_limit.read_register", return_value=80)
+@patch("deye_power_limit.try_read_rated_power", return_value=None)
+@patch("deye_power_limit.load_dotenv")
+def test_main_auto_detect_failure(mock_dotenv, mock_rated, mock_read, capsys):
+  """When auto-detection fails, output shows percentage only."""
+  with patch("sys.argv",
+             ["prog", "--ip", "1.2.3.4", "--serial", "123", "--read-only"]):
+    main()
+  out = capsys.readouterr().out
+  assert "Detected rated power" not in out
+  assert "= 80%" in out
+  assert "max" not in out.split("= 80%")[1]

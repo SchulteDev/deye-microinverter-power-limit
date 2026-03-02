@@ -20,7 +20,7 @@ import time
 
 # ---------- Constants ----------
 REGISTER_ADDR = 40  # Holding register "Active Power Regulation"
-RATED_POWER_REGISTER = 16  # Register 16: Device Rated Power (scale 0.1 W)
+RATED_POWER_REGISTER = 16  # Register 16: Device Rated Power (raw * 0.1 = watts)
 PORT = 8899  # Solarman V5 default port
 MB_SLAVE_ID = 1  # Modbus slave ID
 
@@ -218,17 +218,26 @@ def write_register(ip: str, serial: int, register: int, value: int) -> None:
 
 
 def try_read_rated_power(ip: str, serial: int) -> int | None:
-  """Try to read the rated power (W) from register 16. Returns None on failure."""
+  """Try to read the rated power (W) from register 16.
+
+  Returns None on failure or if the value is outside the plausible range
+  (10–10 000 W).
+  """
   try:
     mb_request = build_modbus_read(MB_SLAVE_ID, RATED_POWER_REGISTER, 1)
     response = send_receive(ip, serial, mb_request)
     mb_response = v5_decode_response(response)
     values = parse_modbus_read_response(mb_response)
     watts = int(values[0] * 0.1)
+    # Generous sanity range — hardware spec is ~1-2250 W, but we accept up
+    # to 10 000 W to cover future models.
     if 10 <= watts <= 10000:
       return watts
-  except (ValueError, OSError):
-    pass
+    print(
+        f"  Auto-detect: register 16 returned {watts} W (outside 10–10000 range), skipping.",
+        file=sys.stderr)
+  except (ValueError, OSError) as e:
+    print(f"  Auto-detect rated power failed: {e}", file=sys.stderr)
   return None
 
 
@@ -262,13 +271,15 @@ def main() -> None:
   )
   parser.add_argument("--ip", default=os.environ.get("DEYE_IP"),
                       help="IP address of the Solarman data logger (env: DEYE_IP)")
-  parser.add_argument("--serial", default=os.environ.get("DEYE_SERIAL"),
-                      type=int,
+  _env_serial = os.environ.get("DEYE_SERIAL")
+  parser.add_argument("--serial", type=int,
+                      default=int(_env_serial) if _env_serial else None,
                       help="Serial number of the data logger (env: DEYE_SERIAL)")
   parser.add_argument("--percent", type=int, default=None,
                       help="Power limit in percent (1-100)")
+  _env_max = os.environ.get("DEYE_MICROINVERTER_MAX_POWER")
   parser.add_argument("--max-power", type=int,
-                      default=os.environ.get("DEYE_MICROINVERTER_MAX_POWER"),
+                      default=int(_env_max) if _env_max else None,
                       help="Rated inverter power in watts (display only, e.g. 1600)"
                            " (env: DEYE_MICROINVERTER_MAX_POWER)")
   parser.add_argument("--read-only", action="store_true",
@@ -286,19 +297,19 @@ def main() -> None:
 
   # --- Rated power (best-effort) ---
   max_power = args.max_power
-  if not max_power:
+  if max_power is None:
     detected = try_read_rated_power(args.ip, args.serial)
-    if detected:
+    if detected is not None:
       max_power = detected
       print(
-        f"Detected rated power: {max_power} W (from register {RATED_POWER_REGISTER})")
+          f"Detected rated power: {max_power} W (from register {RATED_POWER_REGISTER})")
 
   # --- Read ---
   print(
       f"Reading register {REGISTER_ADDR} from {args.ip} (logger {args.serial}) ...")
   current = read_register(args.ip, args.serial, REGISTER_ADDR)
   print(f"Current register value: {current}")
-  if max_power:
+  if max_power is not None:
     print(f"  = {current}% = max {max_power * current / 100:.0f} W")
   else:
     print(f"  = {current}%")
@@ -318,7 +329,7 @@ def main() -> None:
     print(f"ERROR: percent must be between 1 and 100 (got {percent}).")
     sys.exit(1)
 
-  if max_power:
+  if max_power is not None:
     target_w = max_power * percent / 100
     print(f"Setting power limit to {percent}% (max {target_w:.0f} W) ...")
   else:
@@ -333,7 +344,7 @@ def main() -> None:
   print(f"  Read-back value: {verify}%")
 
   if verify == percent:
-    if max_power:
+    if max_power is not None:
       print(f"\nSuccess! Power limited to max {target_w:.0f} W.")
     else:
       print(f"\nSuccess! Power limited to {percent}%.")

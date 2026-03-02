@@ -54,9 +54,11 @@ CLI arguments always override `.env` / environment variables.
 
 ### Example run
 
+When `--max-power` is not provided, the tool attempts to auto-detect the inverter's rated power
+from Modbus register 16:
+
 ```
 $ python deye_power_limit.py --percent 80
-
   AT greeting received, discarded.
 Detected rated power: 1000 W (from register 16)
 Reading register 40 from 192.168.1.x (logger 4567890123) ...
