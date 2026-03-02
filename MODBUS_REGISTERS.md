@@ -1,15 +1,8 @@
 # Deye Microinverter — Modbus Register Reference
 
-## Register 40 (0x0028) — Active Power Regulation — CONFIRMED
+## Register 40 (0x0028) — Active Power Regulation
 
-**Independently confirmed by multiple sources:**
-
-1. **kbialek/deye-inverter-mqtt** — `metric_group_settings_micro.md`: Register 40 = "Active power regulation", unit %, scale 1
-2. **davidrapan/ha-solarman** — `deye_micro.yaml`: Register 0x0028 = "Active Power Regulation", range 0–120%
-3. **StephanJoubert/home_assistant_solarman** — `deye_2mppt.yaml` and `deye_4mppt.yaml`: Register 0x0028
-4. **raschy/ioBroker.deyeidc** — Issue #88: Users confirm writing to register 40
-5. **Akkudoktor Forum** — "You can control the power via register 40 Active Power Regulation"
-6. **Deye Modbus Protocol V118 PDF** (official document, hosted at Hypfer/deye-microinverter-cloud-free-assets)
+This tool writes to register 40 to control the inverter's power output as a percentage (1–100%). The register is documented in the official Deye Modbus Protocol V118 PDF and used by several open-source projects (see [Sources](#sources)).
 
 ---
 
