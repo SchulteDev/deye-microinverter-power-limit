@@ -39,6 +39,18 @@ python deye_power_limit.py --ip 192.168.1.X --serial 1234567890 --percent 50 --m
 python deye_power_limit.py --ip 192.168.1.X --serial 1234567890 --percent 100
 ```
 
+### `.env` File (optional)
+
+Copy `.env.example` to `.env` and fill in your values to avoid repeating `--ip` and `--serial`:
+
+```bash
+cp .env.example .env   # then edit .env
+python deye_power_limit.py --read-only
+python deye_power_limit.py --percent 50
+```
+
+CLI arguments always override `.env` / environment variables.
+
 ## Docker
 
 ```bash
@@ -80,3 +92,13 @@ Recommendations:
 - Only write when the value actually changes
 - Use coarser steps (e.g. 5% instead of 1%)
 - Wait at least 30 seconds between writes
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install pytest
+
+# Run tests
+pytest
+```

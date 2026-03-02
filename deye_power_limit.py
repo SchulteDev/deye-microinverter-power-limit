@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import os
 import socket
 import struct
 import sys
@@ -96,7 +97,7 @@ def v5_decode_response(data: bytes) -> bytes:
   """Extract the Modbus frame from a V5 response (offset 25 to frame_len-2)."""
   if len(data) < 10 or data[0] != 0xA5:
     raise ValueError(
-      f"Invalid V5 frame (len={len(data)}, start=0x{data[0]:02X})")
+        f"Invalid V5 frame (len={len(data)}, start=0x{data[0]:02X})")
 
   if data[-1] != 0x15:
     raise ValueError(f"V5 frame: invalid end byte 0x{data[-1]:02X}")
@@ -116,7 +117,7 @@ def v5_decode_response(data: bytes) -> bytes:
   # Check frametype (must be 0x02 for data frame)
   if len(data) > 11 and data[11] != 0x02:
     raise ValueError(
-      f"V5 frametype 0x{data[11]:02X} (expected 0x02, not a data frame)")
+        f"V5 frametype 0x{data[11]:02X} (expected 0x02, not a data frame)")
 
   # Extract Modbus frame (offset 25 to frame_len-2)
   payload_len = struct.unpack("<H", data[1:3])[0]
@@ -140,7 +141,7 @@ def parse_modbus_read_response(frame: bytes) -> list[int]:
     errors = {1: "Illegal Function", 2: "Illegal Data Address",
               3: "Illegal Data Value", 4: "Slave Device Failure"}
     raise ValueError(
-      f"Modbus error: {errors.get(error_code, f'Code {error_code}')}")
+        f"Modbus error: {errors.get(error_code, f'Code {error_code}')}")
 
   byte_count = frame[2]
   values = []
@@ -215,16 +216,39 @@ def write_register(ip: str, serial: int, register: int, value: int) -> None:
   print(f"  Register {register} = {value} write command sent.")
 
 
+# ========== .env loader ==========
+
+def load_dotenv() -> None:
+  """Load .env file (if present) into os.environ. Existing vars are not overwritten."""
+  env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+  try:
+    with open(env_path) as f:
+      for line in f:
+        line = line.strip()
+        if not line or line.startswith("#"):
+          continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("\"'")
+        if key and _ == "=":
+          os.environ.setdefault(key, value)
+  except FileNotFoundError:
+    pass
+
+
 # ========== Main ==========
 
 def main() -> None:
+  load_dotenv()
+
   parser = argparse.ArgumentParser(
       description="Set power output limit on Deye microinverters via Solarman V5 / Modbus"
   )
-  parser.add_argument("--ip", required=True,
-                      help="IP address of the Solarman data logger")
-  parser.add_argument("--serial", required=True, type=int,
-                      help="Serial number of the data logger")
+  parser.add_argument("--ip", default=os.environ.get("DEYE_IP"),
+                      help="IP address of the Solarman data logger (env: DEYE_IP)")
+  parser.add_argument("--serial", default=os.environ.get("DEYE_SERIAL"),
+                      type=int,
+                      help="Serial number of the data logger (env: DEYE_SERIAL)")
   parser.add_argument("--percent", type=int, default=None,
                       help="Power limit in percent (1-100)")
   parser.add_argument("--max-power", type=int, default=None,
@@ -233,12 +257,18 @@ def main() -> None:
                       help="Only read the current register value")
   args = parser.parse_args()
 
+  if not args.ip:
+    parser.error("--ip is required (or set DEYE_IP in .env / environment)")
+  if args.serial is None:
+    parser.error(
+      "--serial is required (or set DEYE_SERIAL in .env / environment)")
+
   if not (0 < args.serial <= 0xFFFFFFFF):
     parser.error("--serial must be a positive integer (max 4294967295)")
 
   # --- Read ---
   print(
-    f"Reading register {REGISTER_ADDR} from {args.ip} (logger {args.serial}) ...")
+      f"Reading register {REGISTER_ADDR} from {args.ip} (logger {args.serial}) ...")
   current = read_register(args.ip, args.serial, REGISTER_ADDR)
   print(f"Current register value: {current}")
   if args.max_power:
@@ -282,7 +312,7 @@ def main() -> None:
       print(f"\nSuccess! Power limited to {percent}%.")
   else:
     print(
-      f"\nWARNING: Read-back value ({verify}) differs from written value ({percent})!")
+        f"\nWARNING: Read-back value ({verify}) differs from written value ({percent})!")
 
 
 if __name__ == "__main__":
