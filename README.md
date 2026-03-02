@@ -74,7 +74,3 @@ Register 40 writes are **persisted to EEPROM**. EEPROM has limited write cycles 
 - Only write when the value actually changes
 - Use coarser steps (e.g. 5% instead of 1%)
 - Wait at least 30 seconds between writes
-
-## License
-
-[MIT](LICENSE)
