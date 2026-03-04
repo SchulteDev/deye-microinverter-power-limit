@@ -348,6 +348,8 @@ def main() -> None:
       print(f"\nSuccess! Power limited to max {target_w:.0f} W.")
     else:
       print(f"\nSuccess! Power limited to {percent}%.")
+    print(
+      "Note: The inverter typically needs 10-15 minutes to apply the new limit.")
   else:
     print(
         f"\nWARNING: Read-back value ({verify}) differs from written value ({percent})!")

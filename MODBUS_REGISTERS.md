@@ -12,7 +12,8 @@
 | Access  | Read/Write              |
 
 The register value directly sets the inverter's maximum AC output as a percentage of its rated
-power. Values above 100 are rejected or clamped to 100. The value is persisted to EEPROM (see
+power. Values above 100 are rejected or clamped to 100. After writing a new value, the inverter
+typically needs **10–15 minutes** to apply the change. The value is persisted to EEPROM (see
 the [EEPROM warning](README.md#eeprom-wear-warning) in the README).
 
 Read with Modbus function code 0x03, write with FC 0x10. Communication uses the Solarman V5 protocol

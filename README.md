@@ -75,6 +75,7 @@ Setting power limit to 80% (max 800 W) ...
   Read-back value: 80%
 
 Success! Power limited to max 800 W.
+Note: The inverter typically needs 10-15 minutes to apply the new limit.
 ```
 
 ## Docker
