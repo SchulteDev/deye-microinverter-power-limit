@@ -41,7 +41,7 @@ jobs:
           tags: |
             type=sha
             type=ref,event=branch
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
